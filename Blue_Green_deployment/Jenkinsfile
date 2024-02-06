@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                // Checkout code from Git repository if needed
+                git branch: 'main', url: 'https://github.com/your-repo.git'
+            }
+        }
+        stage('Setup Blue Infrastructure') {
+            steps {
+                // Use AWS Credentials plugin to access AWS account
+                sh 'terraform apply -var target_environment=blue'
+            }
+        }
+        stage('Setup Green Infrastructure') {
+            steps {
+                sh 'terraform apply -var target_environment=green'
+            }
+        }
+        stage('Build and Push Container Image') {
+            steps {
+                // Replace with your specific Docker build commands
+                sh 'docker build -t your-image-name .'
+                sh 'aws ecr get-login-password --region your-region | docker login --username AWS --password-stdin your-account-id.dkr.ecr.your-region.amazonaws.com'
+                sh 'docker push your-account-id.dkr.ecr.your-region.amazonaws.com/your-image-name:latest'
+            }
+        }
+        stage('Update Green Task Definition') {
+            steps {
+                sh 'terraform apply -var target_environment=green -var image_uri=your-image-uri'
+            }
+        }
+        stage('Shift Traffic to Green') {
+            steps {
+                sh 'terraform apply -var target_environment=green -var weight=80' // Gradually shift traffic
+                // Add health checks and wait for green readiness
+            }
+        }
+        stage('Optional: Deregister Blue Environment') {
+            steps {
+                sh 'terraform destroy -var target_environment=blue' // Optional cleanup
+            }
+        }
+        stage('Post-Deployment Actions') {
+            steps {
+                // Send notifications, perform cleanup tasks, etc.
+            }
+        }
+    }
+}
+
+
