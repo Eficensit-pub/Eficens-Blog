@@ -1,18 +1,39 @@
 pipeline {
     agent any
 
+    environment {
+        LAMBDA_CODE_DIR = 'lambda_code'  // Directory containing Lambda code
+        LAMBDA_ZIP_FILE = 'lambda_code.zip'  // Zip file name
+        S3_BUCKET = 'my-s3-bucket'
+        LAMBDA_FUNCTION_NAME = 'MyLambdaFunction'
+        GIT_REPO_URL = 'https://github.com/yourusername/your-repo.git'
+        GIT_BRANCH = 'main'  // Specify your Git branch
+    }
+
     stages {
+        stage('Clone Git Repository') {
+            steps {
+                script {
+                    // Clone the Git repository
+                    sh "git clone -b ${GIT_BRANCH} ${GIT_REPO_URL} ${LAMBDA_CODE_DIR}"
+                }
+            }
+        }
+
         stage('Lambda and Code Deployment') {
             steps {
                 script {
+                    // Zip Lambda code
+                    sh "zip -r ${LAMBDA_ZIP_FILE} ${LAMBDA_CODE_DIR}"
+
                     // Deploy Lambda function
                     sh 'bash deploy_lambda.sh'
                     
                     // Upload Lambda code to S3
-                    sh 'aws s3 cp lambda_code.zip s3://my-s3-bucket/'
+                    sh "aws s3 cp ${LAMBDA_ZIP_FILE} s3://${S3_BUCKET}/"
 
                     // Retrieve Lambda code from S3 and update Lambda function
-                    sh 'aws lambda update-function-code --function-name MyLambdaFunction --s3-bucket my-s3-bucket --s3-key lambda_code.zip'
+                    sh "aws lambda update-function-code --function-name ${LAMBDA_FUNCTION_NAME} --s3-bucket ${S3_BUCKET} --s3-key ${LAMBDA_ZIP_FILE}"
                 }
             }
         }
