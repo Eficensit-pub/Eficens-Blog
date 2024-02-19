@@ -1,0 +1,28 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Lambda and Code Deployment') {
+            steps {
+                script {
+                    // Deploy Lambda function
+                    sh 'bash deploy_lambda.sh'
+                    
+                    // Upload Lambda code to S3
+                    sh 'aws s3 cp lambda_code.zip s3://my-s3-bucket/'
+
+                    // Retrieve Lambda code from S3 and update Lambda function
+                    sh 'aws lambda update-function-code --function-name MyLambdaFunction --s3-bucket my-s3-bucket --s3-key lambda_code.zip'
+                }
+            }
+        }
+
+        stage('Configuration') {
+            steps {
+                script {
+                    // Additional configuration steps if needed
+                }
+            }
+        }
+    }
+}
