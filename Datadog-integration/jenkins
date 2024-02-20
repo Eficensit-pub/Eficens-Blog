@@ -2,48 +2,52 @@ pipeline {
     agent any
 
     environment {
-        LAMBDA_CODE_DIR = 'lambda_code'  // Directory containing Lambda code
-        LAMBDA_ZIP_FILE = 'lambda_code.zip'  // Zip file name
-        S3_BUCKET = 'my-s3-bucket'
-        LAMBDA_FUNCTION_NAME = 'MyLambdaFunction'
-        GIT_REPO_URL = 'https://github.com/yourusername/your-repo.git'
-        GIT_BRANCH = 'main'  // Specify your Git branch
+        STACK_NAME = 'YourStackName'
+        TEMPLATE_FILE = 'path/to/your-template.yaml'
+        AWS_REGION = 'YourAWSRegion'
+        AWS_ACCESS_KEY_ID_CREDENTIALS = 'your-aws-access-key-id-credential-id'
+        AWS_SECRET_ACCESS_KEY_CREDENTIALS = 'your-aws-secret-access-key-credential-id'
     }
 
     stages {
-        stage('Clone Git Repository') {
+        stage('Checkout') {
             steps {
+                // Check out the Git repository
                 script {
-                    // Clone the Git repository
-                    sh "git clone -b ${GIT_BRANCH} ${GIT_REPO_URL} ${LAMBDA_CODE_DIR}"
+                    git 'https://github.com/your-username/your-repo.git'
                 }
             }
         }
 
-        stage('Lambda and Code Deployment') {
+        stage('Deploy CloudFormation') {
             steps {
+                // Retrieve AWS access key ID from Jenkins credentials
                 script {
-                    // Zip Lambda code
-                    sh "zip -r ${LAMBDA_ZIP_FILE} ${LAMBDA_CODE_DIR}"
+                    AWS_ACCESS_KEY_ID = credentials("${AWS_ACCESS_KEY_ID_CREDENTIALS}").getUsername()
+                    AWS_SECRET_ACCESS_KEY = credentials("${AWS_SECRET_ACCESS_KEY_CREDENTIALS}").getSecret()
+                }
 
-                    // Deploy Lambda function
-                    sh 'bash deploy_lambda.sh'
-                    
-                    // Upload Lambda code to S3
-                    sh "aws s3 cp ${LAMBDA_ZIP_FILE} s3://${S3_BUCKET}/"
-
-                    // Retrieve Lambda code from S3 and update Lambda function
-                    sh "aws lambda update-function-code --function-name ${LAMBDA_FUNCTION_NAME} --s3-bucket ${S3_BUCKET} --s3-key ${LAMBDA_ZIP_FILE}"
+                // Deploy CloudFormation stack using AWS CloudFormation Jenkins plugin
+                script {
+                    cfnDeploy(
+                        stack: "${STACK_NAME}",
+                        template: "${TEMPLATE_FILE}",
+                        region: "${AWS_REGION}",
+                        capabilities: ['CAPABILITY_IAM'],
+                        accessKeyId: "${AWS_ACCESS_KEY_ID}",
+                        secretKey: "${AWS_SECRET_ACCESS_KEY}"
+                    )
                 }
             }
         }
+    }
 
-        stage('Configuration') {
-            steps {
-                script {
-                    // Additional configuration steps if needed
-                }
-            }
+    post {
+        success {
+            echo 'Stack deployment successful!'
+        }
+        failure {
+            echo 'Stack deployment failed!'
         }
     }
 }
